@@ -422,6 +422,29 @@
                 function randomElement(arr) {
                     return arr[Math.floor(Math.random() * arr.length)];
                 }
+                function weightedRandomElement(arr, weights) {
+                    if (arr.length !== weights.length) {
+                        return randomElement(arr);
+                    }
+
+                    var len = arr.length;
+                    var totalWeights = 0;
+                    for (var i = 0; i < len; i++) {
+                        totalWeights += weights[i];
+                    }
+
+                    // Pick a random value akin to random index.
+                    var threshold = Math.random() * totalWeights;
+                    var total = 0;
+                    for (var i = 0; i < len; i++) {
+                        total += weights[i];
+                        if (total >= threshold) {
+                            return arr[i];
+                        }
+                    }
+
+                    return arr[len - 1];
+                }
                 function challenge(cas) {
                     var params = Algs.kindToParams(kind);
                     var scramble = params.scramble;
@@ -480,11 +503,30 @@
                 kind = "pll"; // default
                 while (Settings.values.algs.length > 0) {
                     var nextAlg;
-                    if (Settings.values.randomOrder) {
-                        nextAlg = randomElement(Settings.values.algs);
-                    } else {
-                        if (algIndex >= Settings.values.algs.length) algIndex = 0;
-                        nextAlg = Settings.values.algs[algIndex++];
+                    
+                    var selectedAlgs = Settings.values.algs;
+                    switch (Settings.values.randomOrder) {
+                        case "random_balanced":
+                            nextAlg = randomElement(selectedAlgs);
+                            break;
+                        case "random_weighted_incorrect":
+                            // Calculate the weights based on the incorrect rate.
+                            var algWeights = [];
+                            for (var i = 0; i < selectedAlgs.length; i++) {
+                                var algStat = Settings.values.algStats[selectedAlgs[i]];
+                                var algWeight = 1;
+                                if (algStat && algStat.solves) {
+                                    var successRate = algStat.solves.correct / (algStat.solves.total + 1); // + 1 to avoid weight being 0.
+                                    algWeight = 1 - successRate;
+                                }
+                                algWeights.push(algWeight);
+                            }
+                            nextAlg = weightedRandomElement(selectedAlgs, algWeights);
+                            break;
+                        case "random_off":
+                        default:
+                            if (algIndex >= Settings.values.algs.length) algIndex = 0;
+                            nextAlg = Settings.values.algs[algIndex++];
                     }
                     var lookup = lookupAlg(nextAlg);
                     if (!lookup) {
